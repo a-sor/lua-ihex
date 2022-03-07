@@ -1,0 +1,4 @@
+
+	- optimize binary writes;
+	- add tests (random files with gaps using srec_cat (?)).
+
