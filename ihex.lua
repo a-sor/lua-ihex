@@ -17,7 +17,7 @@
   local HEX_REC_EXT_LIN_ADDR   = 4
   local HEX_REC_START_LIN_ADDR = 5
 
-  local GAP_FILLER = 0xff
+  local filler = IHEX_GAP_FILLER or 0xff
 
   local sprintf = string.format
 
@@ -25,7 +25,7 @@
 
 local function parse_line(line)
   local slen, saddr1, saddr2, styp, sdata, scrc =
-    line:match('^:(%x%x)(%x%x)(%x%x)(%x%x)(%x*)(%x%x)$')
+    line:match('^:(%x%x)(%x%x)(%x%x)(%x%x)(%x*)(%x%x)[\r]?$')
 
   if not slen then
     return nil, 'Error in line ' .. line
@@ -151,9 +151,15 @@ function ihex_to_bin(ihex_filename, bin_filename)
     return false, 'Couldn\'t open output file for writing: ' .. err
   end
 
-  while bstart < bend do
-    local b = bdata[bstart] or GAP_FILLER
-    -- FIXME writing by the byte; can (should?) we optimize this somehow?
+  -- bstart now contains the address of the first byte
+  -- in the image, bend the address of the byte past
+  -- the last 
+
+  local p = 0
+
+  while p < bend do
+    local b = bdata[p] or filler
+    -- FIXME writing by the byte; can we optimize this somehow?
     ok, err = bin:write(string.char(b))
     if type(ok) ~= 'boolean' then
       ok = ok ~= nil
@@ -161,7 +167,7 @@ function ihex_to_bin(ihex_filename, bin_filename)
     if not ok then
       break
     end
-    bstart = bstart + 1
+    p = p + 1
   end
 
   bin:close()
@@ -296,13 +302,26 @@ end
 
   -----------------------------------------------------------------------------
 
----[[ TEST $ lua thisprog.lua {hex2bin|bin2hex} <inputfile> <outputfile>
-  if arg[1] and arg[2] and arg[3] then
-    if arg[1] == 'hex2bin' then
-      print(ihex_to_bin(arg[2], arg[3]))
-    elseif arg[1] == 'bin2hex' then
-      print(bin_to_ihex(arg[2], arg[3]))
+-- TEST $ lua ihex.lua {hex2bin|bin2hex} <inputfile> <outputfile> 
+
+  local in_main = not pcall(debug.getlocal, 4, 1)
+
+  if in_main then
+    local ok = false
+    local err = 'Invalid parameter(s)\n'..
+      'Usage:\n\t' .. arg[0] .. ' {hex2bin|bin2hex} <inputfile> <outputfile>'
+
+    if arg[1] and arg[2] and arg[3] then
+      if arg[1] == 'hex2bin' then
+        ok, err = ihex_to_bin(arg[2], arg[3])
+      elseif arg[1] == 'bin2hex' then
+        ok, err = bin_to_ihex(arg[2], arg[3])
+      end
+    end
+
+    if not ok then
+      print('*** ERROR: ' .. err)
     end
   end
---]]
+
 
